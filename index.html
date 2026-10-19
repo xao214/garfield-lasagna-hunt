@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Lasagna Hunt">
+<meta name="theme-color" content="#3a0e06">
+<meta name="format-detection" content="telephone=no">
+<title>Garfield's Lasagna Hunt (SNES fan game)</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #3a0e06; color: #fff3e6;
+    font: 15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    overflow: hidden; overscroll-behavior: none; -webkit-user-select: none; user-select: none;
+    -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; touch-action: none; }
+  #wrap { position: fixed; inset: 0; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  #game { width: 100%; height: 100%; }
+  #overlay, #help { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at 50% 30%, #8a2a10 0%, #3a0e06 70%); }
+  #help { display: none; background: rgba(4,4,24,.93); }
+  .card { max-width: 660px; width: calc(100% - 40px); max-height: calc(100% - 30px); overflow: auto; text-align: center; padding: 10px 20px; box-sizing: border-box; }
+  .card img { width: 120px; height: 120px; border-radius: 22px; box-shadow: 0 6px 24px rgba(0,0,0,.6); }
+  h1 { font-size: 24px; margin: 10px 0 4px; letter-spacing: .5px; color: #ffb02e; }
+  .sub { color: #ffd9a8; margin: 0 0 8px; }
+  #startBtn { font-size: 22px; font-weight: 700; color: #3a0e06; background: #ffb02e; border: 0; border-radius: 40px; padding: 14px 44px; margin: 6px 0 12px;
+    box-shadow: 0 4px 0 #a8650a; animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 50% { transform: scale(1.05); } }
+  table { margin: 0 auto; border-collapse: collapse; font-size: 14px; text-align: left; }
+  td { padding: 2px 8px; vertical-align: top; }
+  td:first-child { color: #ffb02e; font-weight: 600; white-space: nowrap; text-align: right; }
+  .small { font-size: 12.5px; color: #e0b89a; margin-top: 10px; }
+  a { color: #8fd3ff; }
+  #rotate { display: none; color: #ffb36b; font-size: 13px; margin: 0 0 8px; }
+  @media (orientation: portrait) { #rotate { display: block; } }
+  #helpBtn { position: fixed; z-index: 9000; top: calc(env(safe-area-inset-top) + 8px); left: calc(env(safe-area-inset-left) + 8px);
+    width: 34px; height: 34px; border-radius: 17px; border: 1px solid rgba(255,255,255,.35); background: rgba(0,0,0,.35);
+    color: #fff; font-size: 18px; font-weight: 700; display: none; padding: 0; }
+  /* bigger touch controls on tablets */
+  @media (min-width: 700px) and (min-height: 600px) {
+    .ejs_virtualGamepad_left  { transform: scale(1.45); transform-origin: left bottom; }
+    .ejs_virtualGamepad_right { transform: scale(1.45); transform-origin: right bottom; }
+    .ejs_virtualGamepad_bottom { transform: scale(1.25); transform-origin: center bottom; }
+  }
+</style>
+</head>
+<body>
+<div id="wrap"><div id="game"></div></div>
+<button id="helpBtn" aria-label="Controls">?</button>
+
+<div id="overlay">
+  <div class="card">
+    <img src="icons/icon-512.png" alt="">
+    <h1>Garfield's Lasagna Hunt</h1>
+    <p class="sub">Six levels between Garfield and the biggest lasagna in town. A personal, non-commercial fan game made for Andy.</p>
+    <button id="startBtn">Tap to start</button>
+    <div id="rotate">Turn your iPad sideways (landscape) for the best view.</div>
+    <div id="controlsNote">
+      <table>
+        <tr><td>D-pad ◀ ▶</td><td>Walk (stairs are automatic)</td></tr>
+        <tr><td>B or A</td><td>Jump (hold to jump higher)</td></tr>
+        <tr><td>Y or X</td><td>Pounce: a dash that stuns enemies</td></tr>
+        <tr><td>▼ + jump</td><td>Drop through a shelf, table or branch</td></tr>
+        <tr><td>START</td><td>Start · pause · confirm · continue after Game Over</td></tr>
+        <tr><td>SELECT</td><td>Enter a password (on the title screen)</td></tr>
+      </table>
+      <p class="small">Keyboard: arrows, X = B, Z = A, S = Y, A = X, Enter = Start, V = Select. Bluetooth game controllers work too.<br>
+      Tip: in Safari use Share → <b>Add to Home Screen</b> for a full-screen app. No sound? Check the iPad volume.<br>
+      <a href="README.md" target="_blank" rel="noopener">Read the full README</a> (passwords, items, levels)</p>
+    </div>
+  </div>
+</div>
+
+<div id="help"><div class="card" id="helpCard"></div></div>
+
+<script>
+(function () {
+  "use strict";
+  // Works offline: answer EmulatorJS's update check locally instead of calling its CDN.
+  var realFetch = window.fetch;
+  window.fetch = function (u) {
+    var url = typeof u === "string" ? u : (u && u.url) || "";
+    if (url.indexOf("cdn.emulatorjs.org") !== -1)
+      return Promise.resolve(new Response('{"version":"4.2.3"}', { status: 200, headers: { "Content-Type": "application/json" } }));
+    return realFetch.apply(this, arguments);
+  };
+  // ---- iOS audio: remember every AudioContext and resume it on any user gesture ----
+  var contexts = [];
+  ["AudioContext", "webkitAudioContext"].forEach(function (name) {
+    var Orig = window[name];
+    if (!Orig) return;
+    var Wrapped = function (opts) { var c = opts === undefined ? new Orig() : new Orig(opts); contexts.push(c); return c; };
+    Wrapped.prototype = Orig.prototype;
+    window[name] = Wrapped;
+  });
+  function resumeAudio() {
+    contexts.forEach(function (c) { if (c.state !== "running" && c.state !== "closed") { try { c.resume(); } catch (e) {} } });
+  }
+  ["touchstart", "touchend", "pointerdown", "keydown", "click"].forEach(function (ev) {
+    document.addEventListener(ev, resumeAudio, { capture: true, passive: true });
+  });
+  // iOS 17+: let the game's audio play even when the side switch / Control Centre is set to silent
+  try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch (e) {}
+
+  var isTouch = ("ontouchstart" in window) || navigator.maxTouchPoints > 0;
+
+  // ---- EmulatorJS configuration ----
+  window.EJS_player = "#game";
+  window.EJS_core = "snes";
+  window.EJS_gameName = "Garfields Lasagna Hunt";
+  window.EJS_gameID = 2;                     // key for save states in IndexedDB
+  window.EJS_gameUrl = "rom/garfield-snes.sfc";
+  window.EJS_pathtodata = "data/";
+  window.EJS_startOnLoaded = true;           // our own "Tap to start" overlay is the user gesture
+  window.EJS_color = "#ffb02e";
+  window.EJS_backgroundColor = "#3a0e06";
+  window.EJS_language = "en-US";
+  window.EJS_disableAutoLang = false;        // EmulatorJS quirk: false = don't fetch a locale file
+  window.EJS_threads = false;
+  window.EJS_volume = 0.8;
+  window.EJS_Buttons = {
+    playPause: true, restart: true, mute: true, volumeSlider: true, fullscreen: true,
+    saveState: true, loadState: true, gamepad: true,
+    settings: false, screenRecord: false, screenshot: false, quickSave: false, quickLoad: false,
+    cheat: false, cacheManager: false, saveSavFiles: false, loadSavFiles: false,
+    netplay: false, diskButton: false, exitEmulation: false
+  };
+  // Touch pad for this game: D-pad, B/A = jump, Y/X = pounce, Start, Select (password). No L/R (unused).
+  window.EJS_VirtualGamepadSettings = [
+    { type: "dpad",   id: "dpad",   location: "left",  left: "50%", top: "50%", joystickInput: false, inputValues: [4, 5, 6, 7] },
+    { type: "button", text: "X",    id: "x",      location: "right", left: 40, bold: true, input_value: 9 },
+    { type: "button", text: "Y",    id: "y",      location: "right", top: 40, bold: true, input_value: 1 },
+    { type: "button", text: "A",    id: "a",      location: "right", left: 81, top: 40, bold: true, input_value: 8 },
+    { type: "button", text: "B",    id: "b",      location: "right", left: 40, top: 80, bold: true, input_value: 0 },
+    { type: "button", text: "Start",  id: "start",  location: "center", left: 60, fontSize: 15, block: true, input_value: 3 },
+    { type: "button", text: "Select", id: "select", location: "center", left: -5, fontSize: 15, block: true, input_value: 2 }
+  ];
+  window.EJS_ready = function () {
+    // EmulatorJS only shows its touch pad if its own start button was tapped; we start from our overlay instead.
+    if (isTouch && window.EJS_emulator) window.EJS_emulator.touch = true;
+  };
+  window.EJS_onGameStart = function () {
+    document.getElementById("helpBtn").style.display = "block";
+    // EmulatorJS ignores contextMenu:false, so hide that menu-bar button ourselves
+    Array.prototype.forEach.call(document.querySelectorAll(".ejs_menu_bar button"), function (b) {
+      if (b.textContent.trim() === "Context Menu") b.style.display = "none";
+    });
+    window.__gameStarted = true;
+    resumeAudio();
+  };
+
+  var started = false;
+  function start(ev) {
+    if (started) return; started = true;
+    if (ev && ev.preventDefault) ev.preventDefault();
+    // Unlock iOS audio inside the gesture by playing one silent sample.
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      var c = new AC(); var b = c.createBuffer(1, 1, 22050); var s = c.createBufferSource();
+      s.buffer = b; s.connect(c.destination); s.start(0); c.resume();
+    } catch (e) {}
+    document.getElementById("overlay").style.display = "none";
+    var sc = document.createElement("script");
+    sc.src = "data/loader.js";
+    document.body.appendChild(sc);
+  }
+  document.getElementById("startBtn").addEventListener("touchend", start);
+  document.getElementById("overlay").addEventListener("click", function (e) { if (e.target.tagName !== "A") start(e); });
+
+  // "?" button: show the controls again (pauses the game while open)
+  var help = document.getElementById("help");
+  document.getElementById("helpCard").innerHTML = document.getElementById("controlsNote").innerHTML +
+    '<p class="small">Tap anywhere to close.</p>';
+  document.getElementById("helpBtn").addEventListener("click", function () {
+    try { window.EJS_emulator.pause(); } catch (e) {}
+    help.style.display = "flex";
+  });
+  help.addEventListener("click", function (e) {
+    if (e.target.tagName === "A") return;
+    help.style.display = "none";
+    try { window.EJS_emulator.play(); } catch (e2) {}
+  });
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+})();
+</script>
+</body>
+</html>
